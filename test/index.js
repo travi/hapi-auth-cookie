@@ -1569,6 +1569,45 @@ describe('scheme', () => {
             });
         });
 
+        it('retains the original path when onRequest re-routes', (done) => {
+
+            const server = new Hapi.Server();
+            server.connection();
+            server.register(require('../'), (err) => {
+
+                expect(err).to.not.exist();
+
+                server.auth.strategy('default', 'cookie', true, {
+                    password: 'password-should-be-32-characters',
+                    ttl: 60 * 1000,
+                    redirectTo: 'http://example.com/login?mode=1',
+                    appendNext: true
+                });
+
+                server.route({
+                    method: 'GET', path: '/', handler: function (request, reply) {
+
+                        return reply('never');
+                    }
+                });
+
+                server.ext('onRequest', (request, reply) => {
+
+                    request.setUrl('/');
+
+                    reply.continue();
+                });
+
+                server.inject('/foo?bar=baz', (res) => {
+
+                    expect(res.statusCode).to.equal(302);
+                    expect(res.headers.location).to.equal('http://example.com/login?mode=1&next=%2Ffoo%3Fbar%3Dbaz');
+                    done();
+                });
+            });
+        });
+
+
         it('appends the custom query when appendNext is string', (done) => {
 
             const server = new Hapi.Server();
